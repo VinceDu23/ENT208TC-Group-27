@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FitVision — AI-Powered Strength Training | 智能力量训练</title>
+  <meta name="description" content="FitVision combines YOLOv8 pose estimation with BLE wearable sensing for real-time strength training feedback. Supports Squat, Bench Press, Deadlift, Overhead Press.">
+  <link rel="icon" type="image/jpeg" href="favicon.jpg">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080c14; --bg2: #0f131f; --card: #151a28;
+      --border: #1e2a3e; --text: #e2e8f0; --text2: #8899aa;
+      --text3: #556070; --accent: #00ff88; --accent2: #00cc66;
+      --warn: #ff6b35; --info: #44aaff; --radius: 14px;
+      --hero-radial: radial-gradient(ellipse 70% 70% at 50% 0%, rgba(0,255,136,0.06) 0%, transparent 70%), radial-gradient(ellipse 50% 60% at 80% 80%, rgba(0,136,255,0.04) 0%, transparent 70%);
+      --cta-radial: radial-gradient(ellipse 60% 60% at 50% 50%, rgba(0,255,136,0.06) 0%, transparent 70%);
+    }
+
+    body.light-theme {
+      --bg: #ffffff; --bg2: #ffffff; --card: #ffffff;
+      --border: #e8e8e8; --text: #1a1d2b; --text2: #5a6072;
+      --text3: #8994a6; --accent: #00a855; --accent2: #008c44;
+      --warn: #e85d2c; --info: #1a73e8;
+      --hero-radial: radial-gradient(ellipse 70% 70% at 50% 0%, rgba(0,170,85,0.05) 0%, transparent 70%), radial-gradient(ellipse 50% 60% at 80% 80%, rgba(26,115,232,0.03) 0%, transparent 70%);
+      --cta-radial: radial-gradient(ellipse 60% 60% at 50% 50%, rgba(0,170,85,0.04) 0%, transparent 70%);
+    }
+    body.light-theme #how, body.light-theme #dataflow { background: var(--bg2); }
+    body.light-theme .btn-primary { color: #fff; }
+    body.light-theme .step-num { color: #fff; }
+    body.light-theme .feature-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
+    body.light-theme .hero::before { opacity: 0.15; }
+
+    html {
+      scroll-behavior: smooth;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+
+    body.zh .en-text { display: none; }
+    body.en .zh-text { display: none; }
+
+    .hero { position: relative; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 60px 24px 100px; overflow: hidden; background: var(--hero-radial); }
+    .hero::before { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 5 L55 30 L30 55 L5 30Z' fill='none' stroke='rgba(255,255,255,0.02)' stroke-width='0.5'/%3E%3C/svg%3E"); opacity: 0.5; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 18px; border-radius: 20px; border: 1px solid rgba(0,255,136,0.25); background: rgba(0,255,136,0.06); color: var(--accent); font-size: 13px; font-weight: 600; margin-bottom: 32px; position: relative; animation: fadeUp 0.8s ease; }
+    .hero-badge .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+    .hero h1 { font-size: clamp(40px, 7vw, 72px); font-weight: 800; line-height: 1.15; position: relative; animation: fadeUp 0.8s 0.1s ease both; }
+    .hero h1 .gradient { background: linear-gradient(135deg, var(--accent) 0%, #00ccff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero .subtitle { font-size: 18px; color: var(--text2); margin-top: 20px; max-width: 560px; position: relative; animation: fadeUp 0.8s 0.2s ease both; }
+    .hero-actions { display: flex; gap: 14px; margin-top: 40px; flex-wrap: wrap; justify-content: center; position: relative; animation: fadeUp 0.8s 0.3s ease both; }
+    .btn-primary { padding: 14px 32px; border: none; border-radius: 12px; background: linear-gradient(135deg, #00cc66, #009944); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; text-decoration: none; transition: all 0.2s; }
+    .btn-primary:hover { box-shadow: 0 6px 28px rgba(0,255,136,0.3); transform: translateY(-2px); }
+    .btn-outline { padding: 14px 32px; border: 1px solid var(--border); border-radius: 12px; background: transparent; color: var(--text2); font-size: 16px; font-weight: 600; cursor: pointer; text-decoration: none; transition: all 0.2s; }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+    .hero-stats { display: flex; gap: 48px; margin-top: 60px; padding: 24px 40px; border-radius: var(--radius); background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); position: relative; animation: fadeUp 0.8s 0.4s ease both; }
+    .hero-stat { text-align: center; }
+    .hero-stat .val { font-size: 28px; font-weight: 800; color: var(--accent); font-family: 'SF Mono','Consolas',monospace; }
+    .hero-stat .lbl { font-size: 12px; color: var(--text3); margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+    @media (max-width: 640px) { .hero-stats { gap: 24px; padding: 18px 24px; } .hero-stat .val { font-size: 22px; } }
+
+    .scroll-hint { position: absolute; bottom: 40px; color: var(--text3); font-size: 13px; animation: bounce 2s infinite; }
+    .scroll-hint::after { content: ' \2193'; font-size: 16px; }
+    @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(8px); } }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+
+    section { padding: 80px 24px; max-width: 1200px; margin: 0 auto; }
+    .section-label { display: inline-block; font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+    .section-title { font-size: clamp(28px, 4vw, 40px); font-weight: 800; margin-bottom: 16px; }
+    .section-desc { font-size: 16px; color: var(--text2); max-width: 600px; line-height: 1.7; }
+
+    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 48px; }
+    .feature-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px 28px; transition: all 0.3s; display: flex; flex-direction: column; gap: 14px; }
+    .feature-card:hover { border-color: rgba(0,255,136,0.25); box-shadow: 0 8px 32px rgba(0,0,0,0.3); transform: translateY(-4px); }
+    .feature-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; background: rgba(0,255,136,0.08); }
+    .feature-card h3 { font-size: 18px; font-weight: 700; }
+    .feature-card p { font-size: 14px; color: var(--text2); line-height: 1.6; }
+    .feature-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+    .feature-tag { padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.04); color: var(--text3); }
+
+    #how { background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    #how .section { max-width: 1200px; margin: 0 auto; padding: 80px 24px; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-top: 48px; }
+    .step-card { text-align: center; padding: 36px 20px; position: relative; }
+    .step-num { width: 52px; height: 52px; border-radius: 50%; margin: 0 auto 20px; background: linear-gradient(135deg, var(--accent2), var(--accent)); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; color: #000; }
+    .step-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .step-card p { font-size: 13px; color: var(--text2); line-height: 1.5; }
+    .step-arrow { position: absolute; right: -12px; top: 40px; color: var(--text3); font-size: 20px; }
+    @media (max-width: 768px) { .step-arrow { display: none; } }
+
+    #exercises { text-align: center; }
+    .ex-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 48px; }
+    @media (max-width: 768px) { .ex-grid { grid-template-columns: repeat(2, 1fr); } }
+    .ex-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px 16px; transition: all 0.3s; cursor: default; }
+    .ex-card:hover { border-color: var(--accent2); }
+    .ex-card .ex-icon { font-size: 36px; margin-bottom: 14px; }
+    .ex-card h4 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+    .ex-card .ex-metrics { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
+    .ex-card .ex-metric { font-size: 12px; color: var(--text2); }
+    .ex-card .ex-metric span { color: var(--accent); font-weight: 700; }
+
+    #tech { text-align: center; }
+    .tech-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-top: 48px; }
+    .tech-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px 16px; transition: all 0.3s; }
+    .tech-card:hover { border-color: var(--info); transform: translateY(-2px); }
+    .tech-card .tc-icon { font-size: 30px; margin-bottom: 12px; }
+    .tech-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .tech-card .tc-ver { font-size: 11px; color: var(--text3); }
+
+    #dataflow { background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .flow-diagram { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 48px; flex-wrap: wrap; }
+    .flow-node { padding: 20px 28px; border-radius: var(--radius); text-align: center; border: 1px solid var(--border); background: var(--card); min-width: 140px; }
+    .flow-node.source { border-color: rgba(68,170,255,0.3); background: rgba(68,170,255,0.06); }
+    .flow-node.process { border-color: rgba(0,255,136,0.3); background: rgba(0,255,136,0.06); }
+    .flow-node.output { border-color: rgba(255,107,53,0.3); background: rgba(255,107,53,0.06); }
+    .flow-node h4 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .flow-node p { font-size: 11px; color: var(--text2); }
+    .flow-arrow { font-size: 22px; color: var(--text3); font-weight: 300; }
+    @media (max-width: 768px) { .flow-arrow { transform: rotate(90deg); } }
+
+    #cta { text-align: center; padding: 100px 24px; background: var(--cta-radial); }
+    #cta h2 { font-size: clamp(28px, 5vw, 44px); font-weight: 800; margin-bottom: 16px; }
+    #cta p { font-size: 17px; color: var(--text2); max-width: 540px; margin: 0 auto 36px; line-height: 1.7; }
+    .cta-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+    footer { text-align: center; padding: 40px 24px; border-top: 1px solid var(--border); color: var(--text3); font-size: 13px; }
+    footer a { color: var(--text2); text-decoration: none; }
+    footer a:hover { color: var(--accent); }
+
+    .header-tools {
+      position: fixed; top: 16px; right: 16px; z-index: 999;
+      display: flex; gap: 8px; align-items: center;
+    }
+    .theme-toggle-landing {
+      width: 36px; height: 36px; padding: 0;
+      border: 1px solid var(--border); border-radius: 50%;
+      background: var(--card); font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    .theme-toggle-landing:hover { border-color: var(--warn); }
+
+    .lang-switch-landing {
+      height: 36px; padding: 0 12px;
+      border: 1px solid var(--border); border-radius: 16px;
+      background: var(--card); color: var(--text2);
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      text-decoration: none; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .lang-switch-landing:hover { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="header-tools">
+  <a href="landing.html" class="lang-switch-landing" id="langSwitch">中文</a>
+  <button class="theme-toggle-landing" id="themeToggleLanding" title="Toggle Theme">🌙</button>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="hero-badge">
+    <span class="live-dot"></span> AI-Powered · Real-Time · Open Source
+  </div>
+  <h1>
+    <span class="zh-text">看得见每一次发力<br><span class="gradient">让训练更聪明</span></span>
+    <span class="en-text">See Every Rep.<br><span class="gradient">Train Smarter.</span></span>
+  </h1>
+  <p class="subtitle">
+    <span class="zh-text">FitVision 融合 YOLOv8 计算机视觉与 BLE 可穿戴传感，实时捕捉您的动作姿态、杠铃轨迹和心率，为力量训练提供专业级即时反馈。</span>
+    <span class="en-text">FitVision combines YOLOv8 computer vision with BLE wearable sensing to capture your movement, barbell trajectory, and heart rate in real time — delivering professional-grade strength training feedback.</span>
+  </p>
+  <div class="hero-actions">
+    <a href="index.html" class="btn-primary"><span class="zh-text">进入应用</span><span class="en-text">Launch App</span></a>
+    <a href="#features" class="btn-outline"><span class="zh-text">了解功能</span><span class="en-text">Explore Features</span></a>
+  </div>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="val">30 fps</div><div class="lbl"><span class="zh-text">实时推理</span><span class="en-text">Real-time Inference</span></div></div>
+    <div class="hero-stat"><div class="val">17 pt</div><div class="lbl"><span class="zh-text">关键点追踪</span><span class="en-text">Keypoints Tracked</span></div></div>
+    <div class="hero-stat"><div class="val">5-zone</div><div class="lbl"><span class="zh-text">心率分区</span><span class="en-text">Heart Rate Zones</span></div></div>
+    <div class="hero-stat"><div class="val"><span class="zh-text">4 种</span><span class="en-text">4</span></div><div class="lbl"><span class="zh-text">训练动作</span><span class="en-text">Exercise Types</span></div></div>
+  </div>
+  <div class="scroll-hint"><span class="zh-text">向下滚动了解更多</span><span class="en-text">Scroll down to learn more</span></div>
+</section>
+
+<!-- ═══ FEATURES ═══ -->
+<section id="features">
+  <span class="section-label"><span class="zh-text">核心功能</span><span class="en-text">Core Features</span></span>
+  <h2 class="section-title"><span class="zh-text">私人 AI 教练，就在你的浏览器里</span><span class="en-text">Your Personal AI Coach, Right in the Browser</span></h2>
+  <p class="section-desc">
+    <span class="zh-text">无需昂贵设备，一台摄像头 + 一根心率带 + 浏览器 = 你的智能训练实验室。</span>
+    <span class="en-text">No expensive equipment needed — just a webcam + heart rate strap + browser = your smart training lab.</span>
+  </p>
+  <div class="features">
+    <div class="feature-card">
+      <div class="feature-icon">🤖</div>
+      <h3><span class="zh-text">YOLOv8 姿态分析</span><span class="en-text">YOLOv8 Pose Analysis</span></h3>
+      <p><span class="zh-text">基于 COCO 17 关键点人体模型，实时计算髋、膝、肩、肘、踝、躯干 6 大关节角度。640×480 输入下达到 30fps 实时推理。</span><span class="en-text">Based on the COCO 17-keypoint human model, computes hip, knee, shoulder, elbow, ankle, and torso angles in real time. Delivers 30 fps inference at 640×480 input resolution.</span></p>
+      <div class="feature-tags"><span class="feature-tag">Ultralytics</span><span class="feature-tag">CPU/GPU</span><span class="feature-tag">MJPEG Stream</span></div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📐</div>
+      <h3><span class="zh-text">杠铃轨迹追踪</span><span class="en-text">Barbell Trajectory Tracking</span></h3>
+      <p><span class="zh-text">每 reps 实时绘制杠铃运动路径，与理想轨迹可视化对比。自动计算偏移量（cm），深蹲前移、硬拉远离身体等错误即时检测。</span><span class="en-text">Plots the barbell path for every rep in real time, visually compared against the ideal trajectory. Automatically calculates deviation (cm) to instantly detect forward lean in squats, bar drift in deadlifts, and more.</span></p>
+      <div class="feature-tags"><span class="feature-tag">Canvas 2D</span><span class="feature-tag">Rep Detection</span></div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">❤️</div>
+      <h3><span class="zh-text">BLE 心率 + 加速度计</span><span class="en-text">BLE Heart Rate + Accelerometer</span></h3>
+      <p><span class="zh-text">Web Bluetooth API 直连 Nano 33 BLE / ESP32 等设备，实时读取心率（HR）和 IMU 加速度计数据。5 区心率可视化 + 卡路里估算 + 恢复状态监测。</span><span class="en-text">Connects directly to Nano 33 BLE, ESP32, and compatible devices via the Web Bluetooth API. Reads heart rate (HR) and IMU accelerometer data in real time. 5-zone HR visualization + calorie estimation + recovery monitoring.</span></p>
+      <div class="feature-tags"><span class="feature-tag">Web Bluetooth</span><span class="feature-tag">GATT</span><span class="feature-tag">IMU</span></div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">⚡</div>
+      <h3><span class="zh-text">传感器融合引擎</span><span class="en-text">Sensor Fusion Engine</span></h3>
+      <p><span class="zh-text">自动融合 YOLO 关节点 + BLE 加速度计 / 速度数据，弥补单一传感器盲区。当传感器无法连接时无缝降级到仿真模式持续运行。</span><span class="en-text">Automatically fuses YOLO keypoints with BLE accelerometer/velocity data to fill single-sensor blind spots. Seamlessly degrades to simulation mode when sensors are unavailable, so training never stops.</span></p>
+      <div class="feature-tags"><span class="feature-tag">Data Fusion</span><span class="feature-tag">Fallback</span></div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3><span class="zh-text">数据可视化分析</span><span class="en-text">Data Visualization & Analytics</span></h3>
+      <p><span class="zh-text">Chart.js 驱动的姿态评分趋势、训练量统计、动作对比雷达图 + 弱点分析建议。训练记录历史支持按动作 / 时间维度过滤。</span><span class="en-text">Chart.js-powered pose score trends, training volume statistics, radar chart comparisons, and weakness analysis with improvement suggestions. Filter training history by exercise type or time range.</span></p>
+      <div class="feature-tags"><span class="feature-tag">Chart.js 4.4</span><span class="feature-tag">Trend</span><span class="feature-tag">Compare</span></div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🌐</div>
+      <h3><span class="zh-text">WebSocket 实时通信</span><span class="en-text">WebSocket Real-Time</span></h3>
+      <p><span class="zh-text">FastAPI 后端通过 WebSocket 双向低延迟推送姿态数据流。前端自动重连机制，5s 连接超时 + 5 次指数退避重试，MJPEG 视频流直连 &amp;lt;img&amp;gt; 标签。</span><span class="en-text">FastAPI backend pushes pose data bidirectionally over WebSocket with ultra-low latency. Auto-reconnect with 5s timeout + 5 exponential backoff retries. MJPEG video stream delivered directly to &amp;lt;img&amp;gt; tags.</span></p>
+      <div class="feature-tags"><span class="feature-tag">WS</span><span class="feature-tag">Auto-Reconnect</span><span class="feature-tag">Ping/Pong</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<div id="how">
+  <div class="section">
+    <span class="section-label"><span class="zh-text">工作流程</span><span class="en-text">How It Works</span></span>
+    <h2 class="section-title"><span class="zh-text">4 步开启智能训练</span><span class="en-text">4 Steps to Start Training Smarter</span></h2>
+    <div class="steps">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <h4><span class="zh-text">启动后端服务</span><span class="en-text">Launch the Backend</span></h4>
+        <p><span class="zh-text">终端运行 <code>python pose_server.py</code>，加载 YOLOv8 模型并打开摄像头，WebSocket 服务就绪。</span><span class="en-text">Run <code>python pose_server.py</code> in your terminal — it loads the YOLOv8 model, opens your camera, and the WebSocket server is ready.</span></p>
+        <span class="step-arrow">→</span>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <h4><span class="zh-text">打开网页应用</span><span class="en-text">Open the Web App</span></h4>
+        <p><span class="zh-text">浏览器访问 localhost，登录后进入仪表盘。支持 Chrome / Edge，中英双语界面。</span><span class="en-text">Navigate to localhost in your browser, log in, and enter the dashboard. Works in Chrome and Edge with a bilingual (ZH/EN) interface.</span></p>
+        <span class="step-arrow">→</span>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <h4><span class="zh-text">连接设备</span><span class="en-text">Connect Your Devices</span></h4>
+        <p><span class="zh-text">一键连接 YOLO 姿态服务 + BLE 心率带 / 加速度计。系统自动融合多源数据，也可在模拟模式下离线演示。</span><span class="en-text">One-click connect to the YOLO pose service and your BLE heart rate strap or accelerometer. The system auto-fuses multi-source data — or use simulation mode for an offline demo.</span></p>
+        <span class="step-arrow">→</span>
+      </div>
+      <div class="step-card">
+        <div class="step-num">4</div>
+        <h4><span class="zh-text">开始训练</span><span class="en-text">Start Training</span></h4>
+        <p><span class="zh-text">选择动作（深蹲/卧推/硬拉/肩推），点击开始。实时查看关节点角度、杠铃轨迹、心率区间，姿势异常即时报警。</span><span class="en-text">Pick an exercise (Squat / Bench Press / Deadlift / Overhead Press) and hit Start. Watch your joint angles, bar path, and HR zone in real time with instant form alerts.</span></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ EXERCISES ═══ -->
+<section id="exercises">
+  <span class="section-label"><span class="zh-text">支持动作</span><span class="en-text">Supported Exercises</span></span>
+  <h2 class="section-title"><span class="zh-text">覆盖 4 大核心力量训练</span><span class="en-text">Covering the 4 Core Strength Lifts</span></h2>
+  <p class="section-desc" style="margin:0 auto;">
+    <span class="zh-text">每种动作均配置了理想关节角度范围、杠铃轨迹模型和专属错误检测规则。</span>
+    <span class="en-text">Each exercise is configured with ideal joint angle ranges, barbell trajectory models, and custom error detection rules.</span>
+  </p>
+  <div class="ex-grid">
+    <div class="ex-card">
+      <div class="ex-icon">🏋️</div>
+      <h4>Squat <span class="zh-text">深蹲</span></h4>
+      <div class="ex-metrics">
+        <div class="ex-metric"><span class="zh-text">髋角理想范围</span><span class="en-text">Hip angle ideal</span> <span>85°-100°</span></div>
+        <div class="ex-metric"><span class="zh-text">膝角理想范围</span><span class="en-text">Knee angle ideal</span> <span>80°-95°</span></div>
+        <div class="ex-metric"><span class="zh-text">检测 <span>4 种</span> 常见错误</span><span class="en-text">Detects <span>4</span> common errors</span></div>
+      </div>
+    </div>
+    <div class="ex-card">
+      <div class="ex-icon">💪</div>
+      <h4>Bench Press <span class="zh-text">卧推</span></h4>
+      <div class="ex-metrics">
+        <div class="ex-metric"><span class="zh-text">肩角理想范围</span><span class="en-text">Shoulder angle ideal</span> <span>80°-100°</span></div>
+        <div class="ex-metric"><span class="zh-text">肘角理想范围</span><span class="en-text">Elbow angle ideal</span> <span>75°-95°</span></div>
+        <div class="ex-metric"><span class="zh-text">检测 <span>3 种</span> 常见错误</span><span class="en-text">Detects <span>3</span> common errors</span></div>
+      </div>
+    </div>
+    <div class="ex-card">
+      <div class="ex-icon">🔩</div>
+      <h4>Deadlift <span class="zh-text">硬拉</span></h4>
+      <div class="ex-metrics">
+        <div class="ex-metric"><span class="zh-text">髋角理想范围</span><span class="en-text">Hip angle ideal</span> <span>140°-180°</span></div>
+        <div class="ex-metric"><span class="zh-text">躯干角理想范围</span><span class="en-text">Torso angle ideal</span> <span>0°-20°</span></div>
+        <div class="ex-metric"><span class="zh-text">检测 <span>3 种</span> 常见错误</span><span class="en-text">Detects <span>3</span> common errors</span></div>
+      </div>
+    </div>
+    <div class="ex-card">
+      <div class="ex-icon">⬆️</div>
+      <h4>Overhead Press <span class="zh-text">肩推</span></h4>
+      <div class="ex-metrics">
+        <div class="ex-metric"><span class="zh-text">肩角理想范围</span><span class="en-text">Shoulder angle ideal</span> <span>150°-180°</span></div>
+        <div class="ex-metric"><span class="zh-text">躯干角理想范围</span><span class="en-text">Torso angle ideal</span> <span>0°-10°</span></div>
+        <div class="ex-metric"><span class="zh-text">检测 <span>3 种</span> 常见错误</span><span class="en-text">Detects <span>3</span> common errors</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ DATA FLOW ═══ -->
+<div id="dataflow">
+  <div class="section" style="max-width:1200px; margin:0 auto; padding:80px 24px; text-align:center;">
+    <span class="section-label"><span class="zh-text">系统架构</span><span class="en-text">System Architecture</span></span>
+    <h2 class="section-title"><span class="zh-text">多源数据融合架构</span><span class="en-text">Multi-Source Data Fusion Architecture</span></h2>
+    <p class="section-desc" style="margin:0 auto 24px;">
+      <span class="zh-text">摄像头 + 可穿戴 → AI 推理 → WebSocket 实时推送 → 浏览器可视化反馈</span>
+      <span class="en-text">Camera + Wearable → AI Inference → WebSocket Real-Time Push → Browser Visualization & Feedback</span>
+    </p>
+    <div class="flow-diagram">
+      <div class="flow-node source"><h4>📷 Camera</h4><p>640×480 30fps</p></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node process"><h4>🧠 YOLOv8-pose</h4><p>17 Keypoints</p></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node process"><h4>⚡ WebSocket</h4><p>Real-time Push</p></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node output"><h4>🖥 Dashboard</h4><p>Angles + Trajectory</p></div>
+    </div>
+    <div class="flow-diagram" style="margin-top:12px;">
+      <div class="flow-node source" style="border-color:rgba(255,107,53,0.3);background:rgba(255,107,53,0.06);"><h4>⌚ BLE Device</h4><p>HR + Accel + IMU</p></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node process" style="border-color:rgba(255,107,53,0.3);background:rgba(255,107,53,0.06);"><h4>🔗 Web Bluetooth</h4><p>GATT Notify</p></div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-node output" style="border-color:rgba(255,107,53,0.3);background:rgba(255,107,53,0.06);"><h4>💓 HR Dashboard</h4><p>5-Zone Visual</p></div>
+    </div>
+    <p style="margin-top: 32px; font-size: 13px; color: var(--text3);">
+      <span class="zh-text">📦 DataFusion 层自动合入 YOLO + BLE 双通道数据，传感器不可用时无缝降级至 SimulationEngine 离线模式</span>
+      <span class="en-text">📦 The DataFusion layer automatically merges YOLO + BLE dual-channel data. Seamlessly falls back to SimulationEngine offline mode when sensors are unavailable.</span>
+    </p>
+  </div>
+</div>
+
+<!-- ═══ TECH STACK ═══ -->
+<section id="tech">
+  <span class="section-label"><span class="zh-text">技术栈</span><span class="en-text">Tech Stack</span></span>
+  <h2 class="section-title"><span class="zh-text">精选技术组合</span><span class="en-text">Curated Technology Mix</span></h2>
+  <p class="section-desc" style="margin:0 auto;">
+    <span class="zh-text">后端 Python · 前端 Vanilla JS · 零构建步骤 · 开箱即用</span>
+    <span class="en-text">Python backend · Vanilla JS frontend · Zero build steps · Works out of the box</span>
+  </p>
+  <div class="tech-grid">
+    <div class="tech-card"><div class="tc-icon">⚡</div><h4>FastAPI</h4><div class="tc-ver">v0.110+</div></div>
+    <div class="tech-card"><div class="tc-icon">🔍</div><h4>YOLOv8</h4><div class="tc-ver">nano-pose</div></div>
+    <div class="tech-card"><div class="tc-icon">📸</div><h4>OpenCV</h4><div class="tc-ver">v4.9+</div></div>
+    <div class="tech-card"><div class="tc-icon">📐</div><h4>NumPy</h4><div class="tc-ver">v1.26+</div></div>
+    <div class="tech-card"><div class="tc-icon">🔌</div><h4>WebSocket</h4><div class="tc-ver">ws://</div></div>
+    <div class="tech-card"><div class="tc-icon">🎨</div><h4>Chart.js</h4><div class="tc-ver">v4.4</div></div>
+    <div class="tech-card"><div class="tc-icon">📶</div><h4>Web BLE</h4><div class="tc-ver">Chrome API</div></div>
+    <div class="tech-card"><div class="tc-icon">🌍</div><h4>i18n</h4><div class="tc-ver">ZH / EN</div></div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section id="cta">
+  <h2><span class="zh-text">准备好让每一次训练都可量化了吗？</span><span class="en-text">Ready to Make Every Rep Count?</span></h2>
+  <p>
+    <span class="zh-text">无需云端、无需订阅。下载即用，隐私数据留在本地。支持 Windows / macOS / Linux，Chrome 浏览器即开即用。</span>
+    <span class="en-text">No cloud, no subscription. Download and go — your data stays local. Works on Windows, macOS, and Linux. Just open Chrome and you're training.</span>
+  </p>
+  <div class="cta-actions">
+    <a href="index.html" class="btn-primary"><span class="zh-text">立即体验</span><span class="en-text">Get Started</span></a>
+    <a href="#features" class="btn-outline"><span class="zh-text">查看文档</span><span class="en-text">View Docs</span></a>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <p>FitVision — AI-Powered Strength Training Assistant</p>
+  <p style="margin-top:6px;">
+    Built with FastAPI + YOLOv8 + Web Bluetooth ·
+    <a href="#">GitHub</a> ·
+    <a href="#">Documentation</a>
+  </p>
+  <p style="margin-top:10px;font-size:11px;">&copy; 2026 FitVision. All rights reserved.</p>
+</footer>
+
+<script>
+(function(){
+  var LANG_KEY = 'fitvision_landing_lang';
+  function applyLang(lang) {
+    document.body.className = (document.body.className || '').replace(/\b(zh|en)\b/g, '').trim();
+    document.body.classList.add(lang);
+    var btn = document.getElementById('langSwitch');
+    if (btn) btn.textContent = lang === 'en' ? '中文' : 'English';
+    localStorage.setItem(LANG_KEY, lang);
+  }
+  // init
+  var savedLang = localStorage.getItem(LANG_KEY);
+  var navLang = navigator.language || navigator.userLanguage || '';
+  var defaultLang = savedLang || (navLang.startsWith('zh') ? 'zh' : 'en');
+  applyLang(defaultLang);
+
+  document.getElementById('langSwitch').addEventListener('click', function(e){
+    e.preventDefault();
+    var current = document.body.classList.contains('zh') ? 'zh' : 'en';
+    applyLang(current === 'zh' ? 'en' : 'zh');
+  });
+
+  // Theme toggle
+  var s = localStorage.getItem('smartlift_theme');
+  if (s === 'light') { document.body.classList.add('light-theme'); }
+  var tbtn = document.getElementById('themeToggleLanding');
+  if (tbtn) tbtn.textContent = s === 'light' ? '☀️' : '🌙';
+  if (tbtn) tbtn.addEventListener('click', function(){
+    var isLight = document.body.classList.toggle('light-theme');
+    localStorage.setItem('smartlift_theme', isLight ? 'light' : 'dark');
+    this.textContent = isLight ? '☀️' : '🌙';
+  });
+})();
+</script>
+</body>
+</html>

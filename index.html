@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FitVision - 智能力量训练助手</title>
+  <link rel="icon" type="image/jpeg" href="favicon.jpg">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- 登录检查 -->
+  <script>
+    (function() {
+      try { var session = JSON.parse(localStorage.getItem('smartlift_user')); if (!session || !session.email) { window.location.href = 'login.html'; } }
+      catch(e) { window.location.href = 'login.html'; }
+    })();
+  </script>
+  <header class="app-header">
+    <div class="logo">
+      <img class="logo-icon-img" src="favicon.jpg" alt="FitVision">
+      <span class="logo-text">FitVision</span>
+    </div>
+    <nav class="tab-nav" id="tabNav">
+      <button class="tab-btn active" data-tab="dashboard">
+        <span class="tab-icon">◉</span><span data-i18n="nav.training">实时追踪</span>
+      </button>
+      <button class="tab-btn" data-tab="records">
+        <span class="tab-icon">▤</span><span data-i18n="nav.records">训练记录</span>
+      </button>
+      <button class="tab-btn" data-tab="analysis">
+        <span class="tab-icon">◎</span><span data-i18n="nav.analysis">数据分析</span>
+      </button>
+      <button class="tab-btn" data-tab="heartrate">
+        <span class="tab-icon">♥</span><span data-i18n="nav.heartrate">心率监测</span>
+      </button>
+      <button class="tab-btn" data-tab="aicoach">
+        <span class="tab-icon">🧠</span><span data-i18n="nav.aicoach">AI教练</span>
+      </button>
+      <button class="tab-btn" data-tab="fitnutrify">
+        <span class="tab-icon">🥗</span><span data-i18n="nav.fitnutrify">FitNutrify</span>
+      </button>
+    </nav>
+    <div class="header-status">
+      <div class="connection-pills">
+        <span class="conn-pill" id="blePill"><span class="pill-dot disconnected"></span><span data-i18n="bt.disconnected">未连接</span></span>
+        <span class="conn-pill" id="yoloPill"><span class="pill-dot disconnected"></span><span data-i18n="yolo.disconnected">未连接</span></span>
+      </div>
+      <button class="lang-switch" id="langSwitch" data-i18n="lang.switch">EN</button>
+      <button class="theme-toggle" id="themeToggle" title="Toggle Theme">🌙</button>
+      <button class="btn-logout" id="btnLogout" data-i18n="nav.logout">退出</button>
+      <div class="device-time" id="deviceTime"></div>
+    </div>
+  </header>
+
+  <main class="app-main" id="mainContent">
+    <!-- ===== Tab 1: 实时训练仪表盘 ===== -->
+    <section class="tab-content active" id="tab-dashboard">
+      <!-- 设备连接面板 -->
+      <div class="connections-bar" id="connectionsBar">
+        <div class="conn-group">
+          <button class="conn-btn ble" id="btnBLEConnect" title="BLE Connect">
+            <span>⚡</span><span data-i18n="bt.connect">连接设备</span>
+          </button>
+          <button class="conn-btn ble" id="btnBLEDisconnect" style="display:none" title="BLE Disconnect">
+            <span>✕</span><span data-i18n="bt.disconnect">断开设备</span>
+          </button>
+          <button class="conn-btn ble-config" id="btnBLEConfig" title="BLE Config">⚙</button>
+          <span class="conn-status" id="bleStatus"></span>
+        </div>
+        <div class="conn-group">
+          <button class="conn-btn yolo" id="btnYoloConnect" title="YOLO Connect">
+            <span>🤖</span><span data-i18n="yolo.connect">连接YOLO</span>
+          </button>
+          <button class="conn-btn yolo" id="btnYoloDisconnect" style="display:none" title="YOLO Disconnect">
+            <span>✕</span><span data-i18n="yolo.disconnect">断开YOLO</span>
+          </button>
+          <button class="conn-btn yolo-config" id="btnYoloConfig" title="YOLO Config">⚙</button>
+          <span class="conn-status" id="yoloStatus"></span>
+        </div>
+        <div class="data-source-badge" id="dataSourceBadge">
+          <span data-i18n="dash.source_sim">模拟模式</span>
+        </div>
+      </div>
+
+      <!-- BLE Config Modal -->
+      <div class="modal-overlay" id="bleConfigModal" style="display:none">
+        <div class="modal-card">
+          <h4 data-i18n="bt.config_title">BLE UUID 配置</h4>
+          <label data-i18n="bt.config_service">Service UUID</label>
+          <input type="text" id="bleServiceUUID" class="modal-input">
+          <label data-i18n="bt.config_hr">心率 Characteristic</label>
+          <input type="text" id="bleHRUUID" class="modal-input">
+          <label data-i18n="bt.config_accel">加速度 Characteristic</label>
+          <input type="text" id="bleAccelUUID" class="modal-input">
+          <div class="modal-actions">
+            <button class="btn-reset" id="btnBLEReset" data-i18n="bt.config_reset">恢复默认</button>
+            <button class="btn-start" id="btnBLESave" data-i18n="bt.config_save">保存配置</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- YOLO Config Modal -->
+      <div class="modal-overlay" id="yoloConfigModal" style="display:none">
+        <div class="modal-card">
+          <h4 data-i18n="yolo.config_title">YOLO 服务器配置</h4>
+          <label data-i18n="yolo.config_url">服务器地址</label>
+          <input type="text" id="yoloServerUrl" class="modal-input" value="ws://localhost:8765/ws">
+          <div class="modal-actions">
+            <button class="btn-start" id="btnYoloSave" data-i18n="yolo.config_save">保存</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 训练状态栏 -->
+      <div class="training-status-bar">
+        <div class="exercise-selector">
+          <button class="ex-btn active" data-exercise="squat" data-i18n="ex.squat">深蹲</button>
+          <button class="ex-btn" data-exercise="bench" data-i18n="ex.bench">卧推</button>
+          <button class="ex-btn" data-exercise="deadlift" data-i18n="ex.deadlift">硬拉</button>
+          <button class="ex-btn" data-exercise="ohp" data-i18n="ex.ohp">肩推</button>
+        </div>
+        <button class="btn-tutorial" id="btnTutorial" title="动作教程">
+          <span>📖</span><span data-i18n="tutorial.title">动作教程</span>
+        </button>
+        <div class="set-rep-display">
+          <div class="sr-item">
+            <span class="sr-label" data-i18n="dash.sets">组数</span>
+            <span class="sr-value" id="setCount">3</span>
+          </div>
+          <div class="sr-divider">/</div>
+          <div class="sr-item">
+            <span class="sr-label" data-i18n="dash.reps">次数</span>
+            <span class="sr-value" id="repCount">0</span>
+            <span class="sr-target">/ 8</span>
+          </div>
+        </div>
+        <!-- 仪表盘心率/蓝牙小面板 -->
+        <div class="mini-hr-panel" id="miniHRPanel">
+          <span class="mini-hr-icon">♥</span>
+          <span class="mini-hr-value" id="miniHRValue">--</span>
+          <span class="mini-hr-bpm">bpm</span>
+          <span class="mini-hr-bt" id="miniBTStatus">⚡--</span>
+        </div>
+        <button class="btn-start" id="btnStart">
+          <span class="btn-start-icon">▶</span>
+          <span data-i18n="dash.start">开始训练</span>
+        </button>
+        <button class="btn-pause" id="btnPause" style="display:none;">
+          <span data-i18n="dash.pause">⏸ 暂停</span>
+        </button>
+        <button class="btn-save-record" id="btnSaveRecord" style="display:none;">
+          <span data-i18n="dash.save_record">💾 记录数据</span>
+        </button>
+        <button class="btn-reset" id="btnReset">
+          <span data-i18n="dash.reset">↺ 重置</span>
+        </button>
+      </div>
+
+      <!-- 主可视化区域 -->
+      <div class="viz-grid">
+        <div class="viz-card trajectory-card">
+          <div class="viz-card-header">
+            <h3 data-i18n="dash.bar_trajectory">杠铃轨迹</h3>
+            <span class="viz-badge" id="trajectoryScore">-- 分</span>
+          </div>
+          <div class="viz-card-body">
+            <canvas id="trajectoryCanvas" width="400" height="400"></canvas>
+            <div class="trajectory-legend">
+              <span><i class="legend-dot ideal"></i> <span data-i18n="dash.ideal_path">理想轨迹</span></span>
+              <span><i class="legend-dot actual"></i> <span data-i18n="dash.actual_path">实际轨迹</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="viz-card skeleton-card">
+          <div class="viz-card-header">
+            <h3 data-i18n="dash.pose_analysis">姿势分析</h3>
+            <span class="viz-badge success" id="postureScore">85 分</span>
+          </div>
+          <div class="viz-card-body">
+            <canvas id="skeletonCanvas" width="300" height="400"></canvas>
+          </div>
+        </div>
+        <!-- 摄像头实时画面 -->
+        <div class="viz-card camera-card">
+          <div class="viz-card-header">
+            <h3>📷 Camera Feed</h3>
+            <span class="viz-badge success" id="cameraStatus">OFF</span>
+          </div>
+          <div class="viz-card-body">
+            <div class="camera-feed-wrapper" id="cameraFeedWrapper">
+              <img id="cameraFeed" src="" alt="Camera feed" class="camera-feed" style="display:none">
+              <div class="camera-placeholder" id="cameraPlaceholder">
+                <span>📷</span><p>Connect YOLO to view camera</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="viz-card metrics-card">
+          <div class="viz-card-header">
+            <h3 data-i18n="dash.live_data">实时数据</h3>
+          </div>
+          <div class="viz-card-body">
+            <div class="metrics-grid">
+              <div class="metric-item"><span class="metric-label" data-i18n="metric.hip">髋角</span><span class="metric-value" id="metricHip">92°</span><div class="metric-bar"><div class="metric-fill green" id="metricHipBar" style="width:75%"></div></div></div>
+              <div class="metric-item"><span class="metric-label" data-i18n="metric.knee">膝角</span><span class="metric-value" id="metricKnee">88°</span><div class="metric-bar"><div class="metric-fill green" id="metricKneeBar" style="width:70%"></div></div></div>
+              <div class="metric-item"><span class="metric-label" data-i18n="metric.trunk">躯干角</span><span class="metric-value" id="metricTrunk">42°</span><div class="metric-bar"><div class="metric-fill warning" id="metricTrunkBar" style="width:65%"></div></div></div>
+              <div class="metric-item"><span class="metric-label" data-i18n="metric.shoulder">肩角</span><span class="metric-value" id="metricShoulder">85°</span><div class="metric-bar"><div class="metric-fill green" id="metricShoulderBar" style="width:80%"></div></div></div>
+              <div class="metric-item"><span class="metric-label" data-i18n="metric.speed">动作速度</span><span class="metric-value" id="metricSpeed">0.8 m/s</span><div class="metric-bar"><div class="metric-fill accent" id="metricSpeedBar" style="width:60%"></div></div></div>
+              <div class="metric-item"><span class="metric-label" data-i18n="metric.deviation">杠铃偏移</span><span class="metric-value" id="metricDeviation">0.3 cm</span><div class="metric-bar"><div class="metric-fill green" id="metricDeviationBar" style="width:15%"></div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="alert-banner" id="alertBanner" style="display:none;">
+        <span class="alert-icon">⚠</span>
+        <span class="alert-text" id="alertText"></span>
+        <button class="alert-close" id="alertClose">✕</button>
+      </div>
+
+      <!-- 动作教程弹窗 -->
+      <div class="modal-overlay" id="tutorialModal" style="display:none">
+        <div class="tutorial-modal-card">
+          <div class="tutorial-modal-header">
+            <h3 data-i18n="tutorial.title">动作教程</h3>
+            <button class="tutorial-modal-close" id="tutorialClose">✕</button>
+          </div>
+          <div class="tutorial-tabs" id="tutorialTabs">
+            <button class="tutorial-tab active" data-ex="squat" data-i18n="ex.squat">深蹲</button>
+            <button class="tutorial-tab" data-ex="bench" data-i18n="ex.bench">卧推</button>
+            <button class="tutorial-tab" data-ex="deadlift" data-i18n="ex.deadlift">硬拉</button>
+            <button class="tutorial-tab" data-ex="ohp" data-i18n="ex.ohp">肩推</button>
+          </div>
+          <div class="tutorial-modal-body">
+            <div class="tutorial-visual">
+              <img id="tutorialGif" src="" alt="Exercise Demo" class="tutorial-gif">
+              <div class="tutorial-gif-placeholder" id="tutorialGifPlaceholder" style="display:none">
+                <span>🏋️</span><p data-i18n="tutorial.gif_loading">动图加载中...</p>
+              </div>
+            </div>
+            <div class="tutorial-info">
+              <p class="tutorial-analysis" id="tutorialAnalysis"></p>
+              <div class="tutorial-muscles" id="tutorialMuscles"></div>
+              <div class="tutorial-steps-wrap">
+                <h4 class="tutorial-section-title" data-i18n="tutorial.steps">动作步骤</h4>
+                <ol class="tutorial-steps" id="tutorialSteps"></ol>
+              </div>
+              <div class="tutorial-mistakes-wrap">
+                <h4 class="tutorial-section-title" data-i18n="tutorial.mistakes">常见错误</h4>
+                <ul class="tutorial-mistakes" id="tutorialMistakes"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Tab 2: 训练记录 ===== -->
+    <section class="tab-content" id="tab-records">
+      <div class="records-header">
+        <h2 data-i18n="records.title">训练记录</h2>
+        <div class="records-actions">
+          <button class="btn-clear-history" id="btnClearHistory" title="清除历史">🗑 <span>清除记录</span></button>
+        </div>
+        <div class="records-filters">
+          <select class="filter-select" id="filterExercise">
+            <option value="all" data-i18n="records.filter_exercise">全部动作</option>
+            <option value="squat" data-i18n="ex.squat">深蹲</option>
+            <option value="bench" data-i18n="ex.bench">卧推</option>
+            <option value="deadlift" data-i18n="ex.deadlift">硬拉</option>
+            <option value="ohp" data-i18n="ex.ohp">肩推</option>
+          </select>
+          <select class="filter-select" id="filterPeriod">
+            <option value="all" data-i18n="records.filter_period">全部时间</option>
+            <option value="week" data-i18n="records.filter_week">本周</option>
+            <option value="month" data-i18n="records.filter_month">本月</option>
+          </select>
+        </div>
+      </div>
+      <div class="records-list" id="recordsList"></div>
+    </section>
+
+    <!-- ===== Tab 3: 数据分析 ===== -->
+    <section class="tab-content" id="tab-analysis">
+      <div class="analysis-grid">
+        <div class="analysis-card">
+          <div class="card-header">
+            <h3 data-i18n="analysis.score_trend">姿势评分趋势</h3>
+            <span class="card-subtitle" data-i18n="analysis.score_trend_sub">近 7 次训练</span>
+          </div>
+          <div class="chart-container"><canvas id="chartPostureScore"></canvas></div>
+        </div>
+        <div class="analysis-card">
+          <div class="card-header">
+            <h3 data-i18n="analysis.volume">训练量统计</h3>
+            <span class="card-subtitle" data-i18n="analysis.volume_sub">本月累计</span>
+          </div>
+          <div class="chart-container"><canvas id="chartVolume"></canvas></div>
+        </div>
+        <div class="analysis-card">
+          <div class="card-header">
+            <h3 data-i18n="analysis.compare">动作评分对比</h3>
+            <span class="card-subtitle" data-i18n="analysis.compare_sub">当前 vs 上次</span>
+          </div>
+          <div class="chart-container"><canvas id="chartExerciseCompare"></canvas></div>
+        </div>
+        <div class="analysis-card">
+          <div class="card-header"><h3 data-i18n="analysis.weakness">弱点分析与建议</h3></div>
+          <div class="weakness-list" id="weaknessList"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Tab 4: 心率监测 ===== -->
+    <section class="tab-content" id="tab-heartrate">
+      <div class="hr-layout">
+        <div class="hr-main-card">
+          <div class="hr-big-number">
+            <div class="hr-pulse-ring" id="hrPulseRing">
+              <span class="hr-value" id="hrValue">--</span>
+              <span class="hr-unit">bpm</span>
+            </div>
+          </div>
+          <div class="hr-zone-info">
+            <span class="hr-zone-label" id="hrZoneLabel" data-i18n="hr.waiting">等待数据...</span>
+            <span class="hr-max-percent" id="hrMaxPercent">--% HRmax</span>
+          </div>
+          <div class="hr-zone-bar-container">
+            <div class="hr-zone-bar">
+              <div class="hr-zone-segment zone1"></div>
+              <div class="hr-zone-segment zone2"></div>
+              <div class="hr-zone-segment zone3"></div>
+              <div class="hr-zone-segment zone4"></div>
+              <div class="hr-zone-segment zone5"></div>
+              <div class="hr-zone-indicator" id="hrZoneIndicator"></div>
+            </div>
+            <div class="hr-zone-labels" id="hrZoneLabels">
+              <span data-i18n="hr.zones.0">热身</span><span data-i18n="hr.zones.1">燃脂</span><span data-i18n="hr.zones.2">有氧</span><span data-i18n="hr.zones.3">高强度</span><span data-i18n="hr.zones.4">极限</span>
+            </div>
+          </div>
+        </div>
+        <div class="hr-chart-card">
+          <div class="card-header"><h3>Heart Rate Trend</h3></div>
+          <div class="chart-container"><canvas id="chartHeartRate"></canvas></div>
+        </div>
+        <div class="hr-stats-card">
+          <div class="card-header"><h3>Training Stats</h3></div>
+          <div class="hr-stats-grid">
+            <div class="hr-stat"><span class="hr-stat-label" data-i18n="hr.training_time">训练时长</span><span class="hr-stat-value" id="hrTrainingTime">00:00</span></div>
+            <div class="hr-stat"><span class="hr-stat-label" data-i18n="hr.avg_hr">平均心率</span><span class="hr-stat-value" id="hrAvg">-- bpm</span></div>
+            <div class="hr-stat"><span class="hr-stat-label" data-i18n="hr.max_hr">最高心率</span><span class="hr-stat-value" id="hrMax">-- bpm</span></div>
+            <div class="hr-stat"><span class="hr-stat-label" data-i18n="hr.calories">估算消耗</span><span class="hr-stat-value" id="hrCalories">0 kcal</span></div>
+            <div class="hr-stat"><span class="hr-stat-label" data-i18n="hr.zone">当前区间</span><span class="hr-stat-value" id="hrZone">--</span></div>
+            <div class="hr-stat"><span class="hr-stat-label" data-i18n="hr.recovery">恢复状态</span><span class="hr-stat-value" id="hrRecovery">--</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Tab 5: AI 教练咨询 ===== -->
+    <section class="tab-content" id="tab-aicoach">
+      <div class="aicoach-layout">
+        <!-- 左侧：聊天区 -->
+        <div class="aicoach-chat-panel">
+          <div class="aicoach-chat-header">
+            <h3><span>🧠</span> <span data-i18n="aicoach.title">AI 健身教练</span></h3>
+            <div class="aicoach-header-actions">
+              <button class="ico-btn" id="btnClearChat" title="Clear Chat" data-i18n-title="aicoach.clear_chat">🗑</button>
+              <button class="ico-btn" id="btnExportChat" title="Export Chat" data-i18n-title="aicoach.export_chat">📥</button>
+              <button class="ico-btn" id="btnToggleConfig" title="API Config" data-i18n-title="aicoach.api_config" style="border-color:rgba(0,255,136,0.25)">⚙</button>
+            </div>
+          </div>
+          <div class="aicoach-messages" id="aicoachMessages">
+            <div class="aicoach-welcome">
+              <div class="welcome-avatar">🧠</div>
+              <h3 data-i18n="aicoach.welcome_title">你好，我是你的 AI 健身教练</h3>
+              <p data-i18n="aicoach.welcome_text">我可以帮你分析训练数据、制定计划、解答动作疑问。配置 API 后即可开始对话。</p>
+              <div class="quick-prompts" id="quickPrompts">
+                <span class="quick-prompt-label" data-i18n="aicoach.quick">快捷提问：</span>
+                <button class="quick-btn" data-prompt="我的深蹲膝盖内扣怎么纠正？">🦵 深蹲膝盖内扣</button>
+                <button class="quick-btn" data-prompt="帮我制定一个3天分化训练计划">📅 训练计划</button>
+                <button class="quick-btn" data-prompt="硬拉时腰背弯曲是什么原因？如何改善？">🔩 硬拉腰痛</button>
+                <button class="quick-btn" data-prompt="减脂期应该如何安排有氧和力量的配比？">🔥 减脂配比</button>
+                <button class="quick-btn" data-prompt="增肌期蛋白质摄入建议是多少？">🥩 蛋白摄入</button>
+                <button class="quick-btn" data-prompt="如何提升卧推的最大重量？">💪 提升卧推</button>
+              </div>
+            </div>
+          </div>
+          <div class="aicoach-typing" id="aicoachTyping" style="display:none">
+            <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+            <span class="typing-text" data-i18n="aicoach.thinking">AI 思考中...</span>
+          </div>
+          <div class="aicoach-input-area">
+            <textarea id="aicoachInput" placeholder="输入你的问题..." data-i18n-placeholder="aicoach.placeholder" rows="1"></textarea>
+            <button class="send-btn" id="btnSendChat" data-i18n-title="aicoach.send">➤</button>
+          </div>
+        </div>
+
+        <!-- 右侧：配置面板（默认隐藏，点击齿轮按钮展开） -->
+        <div class="aicoach-config-panel" id="aicoachConfigPanel" style="display:none;">
+          <div class="config-section">
+            <h4 data-i18n="aicoach.api_config">API 配置</h4>
+            <label data-i18n="aicoach.api_endpoint">Endpoint</label>
+            <input type="text" id="aiEndpoint" class="config-input" value="https://api.deepseek.com/v1/chat/completions" placeholder="https://api.deepseek.com/v1/chat/completions">
+            <label data-i18n="aicoach.api_key">API Key</label>
+            <div class="key-input-wrap">
+              <input type="password" id="aiApiKey" class="config-input" placeholder="sk-...">
+              <button class="toggle-key" id="toggleApiKey">👁</button>
+            </div>
+            <label data-i18n="aicoach.model">Model</label>
+            <input type="text" id="aiModel" class="config-input" value="deepseek-chat" placeholder="deepseek-chat">
+            <div class="config-row">
+              <div class="config-half">
+                <label data-i18n="aicoach.temperature">Temperature</label>
+                <input type="range" id="aiTemperature" min="0" max="2" step="0.1" value="0.7">
+                <span class="range-val" id="temperatureVal">0.7</span>
+              </div>
+              <div class="config-half">
+                <label data-i18n="aicoach.max_tokens">Max Tokens</label>
+                <input type="number" id="aiMaxTokens" class="config-input" value="1024" min="100" max="8192">
+              </div>
+            </div>
+            <div class="config-actions">
+              <button class="btn-conn-save" id="btnSaveAIConfig" data-i18n="aicoach.save_config">保存配置</button>
+              <button class="btn-conn-test" id="btnTestAIConn" data-i18n="aicoach.test_conn">测试连接</button>
+            </div>
+          </div>
+
+          <div class="config-section">
+            <h4 data-i18n="aicoach.system_prompt">System Prompt 设定</h4>
+            <textarea id="aiSystemPrompt" class="system-prompt-input" rows="6">你是一位专业的健身教练和运动科学专家。你有以下能力：
+1. 为用户的力量训练提供动作纠正建议（深蹲、卧推、硬拉、肩推等）
+2. 制定个性化训练计划和周期化方案
+3. 解答营养、增肌、减脂相关问题
+4. 分析训练数据并提供改进方向
+
+回答要求：专业但通俗易懂，给出具体可执行的建议，必要时引用运动科学原理。</textarea>
+            <div class="config-actions">
+              <button class="btn-reset-sm" id="btnResetPrompt" data-i18n="aicoach.reset_prompt">恢复默认</button>
+              <span class="conn-status" id="aiConnStatus"></span>
+            </div>
+          </div>
+
+          <div class="config-section">
+            <h4 data-i18n="aicoach.context_title">训练上下文注入</h4>
+            <p class="config-hint" data-i18n="aicoach.context_hint">开启后会将你的最新训练数据附在 Prompt 中，AI 可据此给出个性化建议。</p>
+            <button class="btn-conn-save" id="btnInjectContext" data-i18n="aicoach.inject_context">📊 注入当前训练数据</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Tab 7: FitNutrify 营养管理 ===== -->
+    <section class="tab-content" id="tab-fitnutrify">
+      <div class="fitnutrify-container">
+        <div class="fitnutrify-toolbar">
+          <span class="fitnutrify-label">🥗 <span data-i18n="nav.fitnutrify">FitNutrify</span> — <span data-i18n="fitnutrify.subtitle">营养与饮食管理</span></span>
+          <button class="fitnutrify-open-btn" id="btnOpenFitnutrify" data-i18n="fitnutrify.open_external">🔗 在新窗口打开</button>
+        </div>
+        <iframe id="fitnutrifyFrame" class="fitnutrify-iframe"
+          src="https://fitnutrify-a0415e13.base44.app"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          loading="lazy"
+          title="FitNutrify">
+        </iframe>
+      </div>
+    </section>
+  </main>
+
+  <!-- 脚本 -->
+  <script src="data.js"></script>
+  <script src="i18n.js"></script>
+  <script src="simulation.js"></script>
+  <script src="bluetooth.js"></script>
+  <script src="yolo_client.js"></script>
+  <script src="data_fusion.js"></script>
+  <script src="rep_detector.js"></script>
+  <script src="ai_coach.js"></script>
+  <script src="trajectory.js"></script>
+  <script src="skeleton.js"></script>
+  <script src="charts.js"></script>
+  <script src="dashboard.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
